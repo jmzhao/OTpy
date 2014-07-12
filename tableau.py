@@ -33,24 +33,24 @@ class tableau :
             for i, (d, a) in enumerate(zip(mat[0][3:], mat[1][3:]))]
         
         #: extract data
+        def addToDatum(onedata) :
+            if onedata != None :
+                if onedata.winner == None :
+                    raise ValueError('no winner form for underline form %s'%(onedata.underline) )
+                self.datum.append(onedata)
         onedata = None
         for line in mat[2:] :
             underline = line[0].strip()
             if underline != '' :
+                addToDatum(onedata)
                 #: new group of data
-                if onedata != None :
-                    if onedata.winner == None :
-                        raise ValueError('no winner form for underline form %s'%(onedata.underline) )
-                    self.datum.append(onedata)
                 onedata = data(underline)
             if line[1].strip() == '' :
                 raise ValueError('empty candidates form when reading underline form %s'%(onedata.underline))
             onedata.candidates[line[1]] = dict((constraint_index, int(degree)) 
                 for constraint_index, degree in enumerate(line[3:]) if degree != '')
             if line[2].strip() != '' :
+                if onedata.winner != None :
+                    raise ValueError('more than one winner when reading underline form %s'%(onedata.underline))
                 onedata.winner = line[1]
-        if onedata != None :
-            if onedata.winner == None :
-                raise ValueError('no winner form for underline form %s'%(onedata.underline) )
-            self.datum.append(onedata)
-        onedata = data(underline)
+        addToDatum(onedata)
