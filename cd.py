@@ -40,10 +40,17 @@ def ConstraintsDemotion(t) :
         #print(loser_indices)
         non_loser_indices = set(t.get_constraint_indices()).difference(loser_indices)
         #print(non_loser_indices)        
-        assert len(non_loser_indices) > 0
+        if not len(non_loser_indices) > 0 :
+            raise ValueError('no constraint is never-losing among %s'%(
+                [t.get_constraint(index=i).abbr for i in loser_indices]))
         ans.extend((t.get_constraint(index=i), stratum_no) for i in non_loser_indices)
         if len(loser_indices) == 0 : break        
         stratum_no += 1
         discard(loser_indices, non_loser_indices)
     return ans
-    
+
+def toString(ans) :
+    lines = [('Stratum\tAbbreviation')]
+    for c, s in ans :
+        lines.append('\t'.join((str(s), c.abbr)))
+    return '\n'.join(lines)
