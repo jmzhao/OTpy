@@ -1,52 +1,50 @@
-#import tableau
+from tableau import subtract
 
 def ConstraintsDemotion(t) :
     ''' input tableau t, output ranking stratum for each constraint'''
-    def subtract(cons_row1, cons_row2) :
-        ans = dict()
-        for i1, d1 in cons_row1.items() :
-            if i1 not in cons_row2 :
-                ans[i1] = d1
-            elif d1 > cons_row2[i1] :
-                ans[i1] = d1 - cons_row2
-        return ans
-    def find_loser() :
-        loser_set = set()
+    def find_dominated() :
+        dominated_set = set()
         for data in t.datum :
             winner_constraint = data.candidates[data.winner]
             for s in data.candidates :
                 if s != data.winner :
                     s_constraint = data.candidates[s]
-                    loser_constraint = subtract(winner_constraint, s_constraint)
-                    #print(winner_constraint, s_constraint, loser_constraint)
-                    #: assert subtract(s_constraint, winner_constraint) not empty
-                    loser_set.update(loser_constraint)
-        return loser_set
-    def discard(loser_indices, non_loser_indices) :
-        t.constraints = [t.get_constraint(index=i) for i in loser_indices]
+                    dominated_constraint = subtract(winner_constraint, s_constraint)
+                    #print(winner_constraint, s_constraint, dominated_constraint)
+                    ## assert subtract(s_constraint, winner_constraint) not empty
+                    ## this is garanteed if there is no harmonically bounded winner
+                    dominated_set.update(dominated_constraint)
+        return dominated_set
+    def discard(dominated_indices, undominated_indices) :
+        t.constraints = [t.get_constraint(index=i) for i in dominated_indices]
         #print(t.get_constraint_indices())
         for d in t.datum :
-            for cand, cons in list(d.candidates.items()) :
-                if len(set(cons).intersection(non_loser_indices)) > 0 :
+            winner_vio_dict = d.candidates[d.winner]
+            for cand, vio_dict in list(d.candidates.items()) :
+                if (cand != d.winner
+                and len(set(subtract(vio_dict, winner_vio_dict)).intersection(undominated_indices))) > 0 :
+                    ## this candidate can be explained by undominated constraints
                     d.candidates.pop(cand)
-            assert len(d.candidates) > 0
-        t.datum = [d for d in t.datum if len(d.candidates) == 1] #: only winner left
+            assert len(d.candidates) > 0 ## at least the winner should be left
+        ## discard the group that only has the winner candidate
+        t.datum = [d for d in t.datum if len(d.candidates) > 1]
                 
     ans = list()
     stratum_no = 1
     while len(t.constraints) > 0 :
         #print(t.get_constraint_indices())
-        loser_indices = find_loser()
-        #print(loser_indices)
-        non_loser_indices = set(t.get_constraint_indices()).difference(loser_indices)
-        #print(non_loser_indices)        
-        if not len(non_loser_indices) > 0 :
-            raise ValueError('no constraint is never-losing among %s'%(
-                [t.get_constraint(index=i).abbr for i in loser_indices]))
-        ans.extend((t.get_constraint(index=i), stratum_no) for i in non_loser_indices)
-        if len(loser_indices) == 0 : break        
+        dominated_indices = find_dominated()
+        #print(dominated_indices)
+        undominated_indices = set(t.get_constraint_indices()).difference(dominated_indices)
+        #print(undominated_indices)        
+        if not len(undominated_indices) > 0 :
+            raise ValueError('no constraint is undominated among %s'%(
+                [t.get_constraint(index=i).abbr for i in dominated_indices]))
+        ans.extend((t.get_constraint(index=i), stratum_no) for i in undominated_indices)
+        if len(dominated_indices) == 0 : break        
         stratum_no += 1
-        discard(loser_indices, non_loser_indices)
+        discard(dominated_indices, undominated_indices)
+        print(t.toString())
     return ans
 
 def toString(ans) :

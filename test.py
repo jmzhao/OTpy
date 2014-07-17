@@ -1,14 +1,19 @@
 import tableau as tb
 import cd
 
+t = tb.tableau()
+
 def test(fname) :
     print('-----test for "%s"------'%fname)
-    t = tb.tableau(fname)
     try :
+        t.readFile(fname)
         print(cd.toString(cd.ConstraintsDemotion(t)))
+    except tb.InputError as e :
+        print('Error when reading file:', e)
     except ValueError as e :
-        print(e)
+        print('Error when processing:', e)
 
-test('Ilokano.txt')
-test('TinyIllustrativeFile.txt')
-test('contradiction.txt')
+test('''.\InputFiles\Ilokano.txt''')
+#test('''.\InputFiles\contradiction.txt''')
+test('''.\InputFiles\HarmonicallyBounded.txt''')
+test('''.\InputFiles\Hebrew.txt''')
