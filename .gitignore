@@ -1,2 +1,4 @@
 *.pyc
 win
+InputFiles
+cxfreeze.bat
