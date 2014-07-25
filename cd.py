@@ -1,5 +1,17 @@
 from tableau import subtract
 
+class Error(Exception) :
+    pass
+class ProcessError(Error) :
+    pass
+class UnsatisfiableError(ProcessError) :
+    def __init__(self, canstraint_list, *args) :
+        super().__init__(*args)
+        self.unsatisfiable_canstraint_list = canstraint_list
+    def __str__(self) :
+        return 'no constraint is undominated among %s'%(
+                [c.abbr for c in self.unsatisfiable_canstraint_list])
+                
 def ConstraintsDemotion(t) :
     ''' input tableau t, output ranking stratum for each constraint'''
     def find_dominated() :
@@ -38,8 +50,7 @@ def ConstraintsDemotion(t) :
         undominated_indices = set(t.get_constraint_indices()).difference(dominated_indices)
         #print(undominated_indices)        
         if not len(undominated_indices) > 0 :
-            raise ValueError('no constraint is undominated among %s'%(
-                [t.get_constraint(index=i).abbr for i in dominated_indices]))
+            raise UnsatisfiableError([t.get_constraint(index=i) for i in dominated_indices])
         ans.extend((t.get_constraint(index=i), stratum_no) for i in undominated_indices)
         if len(dominated_indices) == 0 : break        
         stratum_no += 1
