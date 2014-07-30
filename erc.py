@@ -21,7 +21,16 @@ vL = value(0)
 #    if x == 2 : return vW
 #    raise InvalidValueError(x)
 class ERC(tuple) :
-    def cnt_value(self, value) : return sum(1 for v in self if v == value)
+    def __hash__(self) :
+        ans = 0
+        for v in self :
+            ans *= 3
+            ans += v
+        return ans
+    def cnt_value(self, value) : 
+        return sum(1 for v in self if v == value)
+    def get_indices(self, value) : 
+        return (i for i,x in enumerate(self) if x == value)
 
 ## Lombardi’s Swedish, used frequently in (Prince and Brasoveanu 2010)
 test_ercs = [

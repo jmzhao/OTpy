@@ -1,6 +1,7 @@
 ## An implentation of Fusional Reduction Algorithm (Prince and Brasoveanu 2010)
 #import tableau as tb
 import erc
+import hasse
 
 class Error(Exception) :
     pass
@@ -26,13 +27,13 @@ class __FRedans :
         self.MIB.add(MIBerc)
         self.SKB.add(SKBerc)
     def __str__(self) :
-        return ('MIB:\n'
+        return ('Most Informative Basis (MIB):\n'
         + '\n'.join(str(e) for e in self.MIB)
-        + '\nSKB:\n'
+        + '\nSkeletal Basis (SKB):\n'
         + '\n'.join(str(e) for e in self.SKB)
         )
 ''' use erc.get_ERClist(t) to get suitable input '''
-def FRed(ERClist) :
+def __FRed(ERClist) :
     ''' Fusional Reduction Algorithm.
     input: list of Elementary Ranking Conditions (ERCs): list(ERC)
     output: Most Infomative Basis (MIB): set(ERC) '''
@@ -54,18 +55,23 @@ def FRed(ERClist) :
         ## if this is the case, there is no need to continue processing
     ## info loss residues are all that cannot be entailed from fus
     total_residue = tuple(e for e in ERClist if not erc.arrow(fus, e))
-    print('total_residue', total_residue)
+    #print('total_residue', total_residue)
     ## find each residue and do FRed on each of them (recursion)
     if len(total_residue) > 0 :
         for i, v in enumerate(fus) :
             if v == erc.vW : ## this is where "f A[i] = W"
                 ## "Res(A,i)"
-                residue = list(e for e in total_residue if e[i] == erc.ve)
+                residue = tuple(e for e in total_residue if e[i] == erc.ve)
                 if len(residue) == 0 : continue
-                print('i =', i, residue)
+                #print('i =', i, residue)
+                ## suggested by Hayes, only recurse when residue is not calculated
+                h_residue = tuple(hash(r) for r in residue)
+                global calculated_ERC_set
+                if h_residue not in calculated_ERC_set :
+                    calculated_ERC_set.add(h_residue)
                 ## calc "FNF(Res(A,i))" and union it to ans
                 ## residue may be empty, but it doesn't matter
-                ans.update(FRed(residue))
+                    ans.update(__FRed(residue))
         fus_res = erc.fuse(total_residue)
         ## for SKB
         new_fus = erc.ERC(erc.ve if v == erc.vL else fus[i] for i,v in enumerate(fus_res))
@@ -79,4 +85,7 @@ def FRed(ERClist) :
     else : ## retain it
         ans.add(MIBerc=fus, SKBerc=new_fus)
     return ans
-    
+def FRed(ERClist) :
+    global calculated_ERC_set
+    calculated_ERC_set = set()
+    return __FRed(ERClist)
