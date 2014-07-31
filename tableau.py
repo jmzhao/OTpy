@@ -7,7 +7,23 @@ class data :
     def __init__(self, underlying) :
         self.underlying = underlying
         self.candidates = dict()
-        self.winner = None
+        self._winners = dict()
+        self._winner = None
+    @property
+    def winner(self) :
+        return self._winner
+    @winner.setter
+    def winner(self, value) :
+        self._winner = value
+        self.winners = {value:1}
+    @property
+    def winners(self) :
+        return self._winners
+    @winners.setter
+    def winners(self, value) :
+        self._winners = value
+        self._winner = tuple(value)[0]
+    
         
 def subtract(vio_dict1, vio_dict2) :
     ''' get the index of constraints in $vio_dict1 whose degree of violation is bigger 
@@ -60,6 +76,7 @@ class tableau :
         def addToDatum(onedata) :
             ''' put information for one input into the structure '''
             if onedata != None : ## indeed has extracted data
+                onedata.winners = onedata.winners ## this is a bit odd, see getter and setter
                 if onedata.winner == None : ## has no winner candidate
                     raise InputError('no winner form for underlying form "%s"'%(onedata.underlying) )
                 else :
@@ -84,10 +101,13 @@ class tableau :
                 for constraint_index, degree in enumerate(line[3:]) if degree != '')
             ## winner candidate
             if line[2].strip() != '' : ## if this is a winner
+                '''
                 if onedata.winner != None : ## already has a winner
                     ## more than one candidate for single underlying form, which is not allowed for now
                     raise InputError('more than one winner when reading underlying form %s'%(onedata.underlying))
                 onedata.winner = line[1]
+                '''
+                onedata.winners.update({line[1]:float(line[2])})
         addToDatum(onedata) ## don't forget to save the last group of data
     def toMat(self) :
         mat = list()
