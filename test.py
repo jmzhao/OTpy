@@ -17,7 +17,7 @@ def test(fname) :
         #print(*(d.candidates for d in t.datum))
         ## MaxEnt
         print(*sorted((w, t.get_constraint(index=i).abbr) 
-                    for i, w in enumerate(maxent.MaximumEntropy(t))),
+                    for i, w in (maxent.MaximumEntropy(t)).items()),
             sep='\n')
 #        ## FRed
 #        ercs = fred.erc.get_ERClist(t)

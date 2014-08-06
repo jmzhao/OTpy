@@ -15,6 +15,10 @@ class UnsatisfiableError(ProcessError) :
         return 'fail when processing unsatisfiable ERCs as: %s'%(
             self.unsatisfiable_ERClist)
 
+def FRed(ERClist) :
+    global calculated_ERC_set
+    calculated_ERC_set = set()
+    return __FRed(ERClist)
 class __FRedans :
     ''' for the return value of FRed(...) '''
     def __init__(self) :
@@ -85,7 +89,3 @@ def __FRed(ERClist) :
     else : ## retain it
         ans.add(MIBerc=fus, SKBerc=new_fus)
     return ans
-def FRed(ERClist) :
-    global calculated_ERC_set
-    calculated_ERC_set = set()
-    return __FRed(ERClist)

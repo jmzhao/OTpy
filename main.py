@@ -134,15 +134,15 @@ class Application(tk.Frame):
     def z_maxent(self) :
         ''' actiion for Maximum Entropy button '''
         cnt = [0]
-#        def rep(w) :
-#            cnt[0] += 1
-#            self.xst_output.delete(1.0, tk.END)
-#            self.xst_output.insert(tk.END, 'Iteration count: %d\n'%(cnt[0]))
+        def rep(w) :
+            cnt[0] += 1
+            self.xst_output.delete(1.0, tk.END)
+            self.xst_output.insert(tk.END, 'Iteration count: %d\n'%(cnt[0]))
         t = tb.tableau()
         try :
             def task() :
                 t.readString(self.y_input)
-                ans = maxent.MaximumEntropy(t, callback=print)
+                ans = maxent.MaximumEntropy(t)
                 def toString(a) :
                     return '\n'.join('%s\t%s'%x for x in sorted(
                         ((t.get_constraint(index=i).abbr, w) for i, w in enumerate(a)), 
