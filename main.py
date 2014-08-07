@@ -57,6 +57,7 @@ class Application(tk.Frame):
     @y_output.setter
     def y_output(self, value_dict) :
         del self.y_output
+        if type(value_dict) is not dict : value_dict = {'value':value_dict}
         self._y_output = value_dict
         toString = value_dict.get('toString', lambda x: x)
         self.xst_output.insert(tk.END, toString(self.y_output))
@@ -136,17 +137,20 @@ class Application(tk.Frame):
         cnt = [0]
         def rep(w) :
             cnt[0] += 1
-            self.xst_output.delete(1.0, tk.END)
-            self.xst_output.insert(tk.END, 'Iteration count: %d\n'%(cnt[0]))
+            if cnt[0] % 100 == 0 :
+                self.y_output = 'Iteration count: %d\n'%(cnt[0])
+#                self.xst_output.delete(1.0, tk.END)
+#                self.xst_output.insert(tk.END, 'Iteration count: %d\n'%(cnt[0]))
         t = tb.tableau()
         try :
             def task() :
                 t.readString(self.y_input)
-                ans = maxent.MaximumEntropy(t)
+                ans = maxent.MaximumEntropy(t, callback=rep)
                 def toString(a) :
-                    return '\n'.join('%s\t%s'%x for x in sorted(
-                        ((t.get_constraint(index=i).abbr, w) for i, w in enumerate(a)), 
-                        key=(lambda a:a[1])))
+                    s = sorted(
+                        ((t.get_constraint(index=i).abbr, -w) for i, w in a.items()), 
+                        key=(lambda a:a[1]), reverse=True)
+                    return '\n'.join(('%'+str(max(len(abbr) for abbr, _ in s))+'s\t%s')%x for x in s)
                 self.y_output = {'caller':self.z_maxent, 'value':ans, 'toString':toString}
             self.y_running = th.Thread(target=task)
             self.y_running.start()

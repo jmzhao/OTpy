@@ -7,6 +7,20 @@ def MaximumEntropy(t, method='GIS', callback=None, **d) :
             #'CG':maxent_cg, ## under construction
             }.get(method)(t, callback=callback, **d)
 
+class __ins_object :
+    def __init__(self) :
+        self.cand = None
+        self.freq = None
+    def __str__(self) :
+        return '%s%s'%(self.freq, self.cand)
+    __repr__ = __str__
+class __cand_object :
+    def __init__(self) :
+        self.vio = None
+        self.freq = None
+    def __str__(self) :
+        return '%s%s'%(self.freq, self.vio)
+    __repr__ = __str__
 def get_maxent_input(t) :
     cnt_examples = 0
     for d in t.datum :
@@ -31,12 +45,12 @@ def get_maxent_input(t) :
     cons_ind = t.get_constraint_indices()
     instance = list()
     for d in t.datum :
-        ins = object()
+        ins = __ins_object()
         ins.cand = list()
         for cand, vio_dict in d.candidates.items() :
-            c = object()
+            c = __cand_object()
             c.vio = tuple(vio_dict.get(i, 0) for i in cons_ind)
-            c.freq = d.winners.get(cand, 0) / cnt_examples
+            c.freq = d.winners.get(cand, 0)  / cnt_examples
             ins.cand.append(c)
         ins.freq = sum(c.freq for c in ins.cand)
         instance.append(ins)
@@ -48,10 +62,12 @@ def get_maxent_input(t) :
             for c in ins.cand)
         for ins in instance)
             
-    return {'ins':instance, 'obs':observed, 'slo':slowing_factor, 
+    ans = {'ins':instance, 'obs':observed, 'slo':slowing_factor, 
     'ind':cons_ind}
+    print(ans)
+    return ans
             
-def maxent_gis(t, maxiter=100, lower_lim=0, upper_lim=50, callback=None) :
+def maxent_gis(t, maxiter=1000, lower_lim=-50, upper_lim=0, callback=None) :
     inp = get_maxent_input(t)
     instance = inp['ins']
     observed = inp['obs']
@@ -72,11 +88,13 @@ def maxent_gis(t, maxiter=100, lower_lim=0, upper_lim=50, callback=None) :
             for y, c in enumerate(ins.cand) :
                 for i, fi in enumerate(c.vio) :
                     if fi != 0 :
-                        expected[i] += fi * math.exp(sj[y])
-            expected = tuple(e/z for e in expected)
+                        expected[i] += fi * math.exp(sj[y]) / z * ins.freq
+            #expected = tuple(e/z for e in expected)
         
-        delta = tuple(math.log(oi/ei)/slowing_factor for oi,ei in zip(observed, expected))        
+        delta = tuple(math.log(oi/ei)/slowing_factor if oi!=0 else lower_lim
+            for oi,ei in zip(observed, expected))        
         w = tuple(trim(wi+di) for wi,di in zip(w,delta))
+        if callback : callback(w)
     return dict(zip(cons_ind, w))
 
 def maxent_cg(t, callback=None) :
