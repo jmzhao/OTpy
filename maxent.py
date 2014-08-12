@@ -2,10 +2,13 @@
 #import scipy.optimize ## for Conjugate Gradient
 import math
 
-def MaximumEntropy(t, method='GIS', callback=None, **d) :
+def MaximumEntropy(t, method='GIS', **d) :
+    ''' Maximum Entropy model
+    method = 'GIS'|'SCGIS', 'GIS' is default'''
     return {'GIS':maxent_gis,
+            'SCGIS':maxent_scgis,
             #'CG':maxent_cg, ## under construction
-            }.get(method)(t, callback=callback, **d)
+            }.get(method)(t, **d)
 
 class __ins_object :
     def __init__(self) :
@@ -26,22 +29,6 @@ def get_maxent_input(t) :
     for d in t.datum :
         for frequency in d.winners.values() :
             cnt_examples += frequency
-    '''
-    instance = list()
-    for d in t.datum :
-        ins = object()
-        ins.f = tuple(vio_dict for cand, vio_dict in d.candidates.items() )
-        ins.freq = dict((i, d.winners[cand]/cnt_examples)
-            for i, cand in enumerate(d.candidates) if cand in d.winners)
-        ins.tot_freq = sum(ins.freq.values())
-        instance.append(ins)
-    observed = dict((i_cons, 
-                     sum(sum(ins.f[j_cand].get(i_cons, 0)*freq for j_cand, freq in ins.freq.values()) 
-                     for ins in instance))
-                     for i_cons in t.get_constraint_indices()):
-    slow = max(max( for y_cand in ins.f)
-            for ins in instance)
-    '''
     cons_ind = t.get_constraint_indices()
     instance = list()
     for d in t.datum :
@@ -61,13 +48,18 @@ def get_maxent_input(t) :
     slowing_factor = max(max(sum(c.vio)
             for c in ins.cand)
         for ins in instance)
+    slowing_factor_list = tuple(max(max(c.vio[i]
+                for c in ins.cand)
+            for ins in instance)
+        for i in range(len(cons_ind)))
             
     ans = {'ins':instance, 'obs':observed, 'slo':slowing_factor, 
-    'ind':cons_ind}
+    'ind':cons_ind, 'slolist':slowing_factor_list}
     print(ans)
     return ans
             
-def maxent_gis(t, maxiter=1000, lower_lim=-50, upper_lim=0, callback=None) :
+def maxent_gis(t, maxiter=1000, needtrim=True, lower_lim=-50, upper_lim=0, callback=None) :
+    '''Generrized Iterative Scaling'''
     inp = get_maxent_input(t)
     instance = inp['ins']
     observed = inp['obs']
@@ -75,8 +67,11 @@ def maxent_gis(t, maxiter=1000, lower_lim=-50, upper_lim=0, callback=None) :
     cons_ind = inp['ind']
     all0 = list(0 for _ in cons_ind)
     cons_n = len(cons_ind)
-    def trim(w) :
-        return max(min(w, upper_lim), lower_lim)
+    if needtrim :
+        def trim(w) :
+            return max(min(w, upper_lim), lower_lim)
+    else :
+        def trim(w) : return w
     
     w = tuple(all0)
     for _ in range(maxiter) :
@@ -94,6 +89,47 @@ def maxent_gis(t, maxiter=1000, lower_lim=-50, upper_lim=0, callback=None) :
         delta = tuple(math.log(oi/ei)/slowing_factor if oi!=0 else lower_lim
             for oi,ei in zip(observed, expected))        
         w = tuple(trim(wi+di) for wi,di in zip(w,delta))
+        if callback : callback(w)
+    return dict(zip(cons_ind, w))
+
+def maxent_scgis(t, maxiter=1000, needtrim=True, lower_lim=-50, upper_lim=0, callback=None) :
+    '''Sequential Conditional Generalized Iterative Scaling'''
+    inp = get_maxent_input(t)
+    instance = inp['ins']
+    observed = inp['obs']
+    sf_list = inp['slolist']
+    cons_ind = inp['ind']
+    all0 = list(0 for _ in cons_ind)
+    cons_n = len(cons_ind)
+    if needtrim :
+        def trim(w) :
+            return max(min(w, upper_lim), lower_lim)
+    else :
+        def trim(w) : return w
+    
+    w = list(all0)
+    z = list(len(ins.cand) for ins in instance)
+    s = list(list(0 for c in ins.cand)
+        for ins in instance)
+    for _ in range(maxiter) :
+        for i in range(cons_n) :
+            expectedi = sum(ins.freq*sum(c.vio[i]*math.exp(s[j][y])/z[j]
+                    for y, c in enumerate(ins.cand) if c.vio[i] != 0)
+                for j, ins in enumerate(instance))
+            if observed[i] != 0 :
+                di = math.log(observed[i]/expectedi) / sf_list[i]
+                wi = trim(w[i]+di)
+            else : 
+                wi = lower_lim
+            if wi != w[i] :
+                di = wi - w[i]
+                w[i] = wi
+                for j, ins in enumerate(instance) :
+                    for y, c in enumerate(ins.cand) :
+                        if c.vio[i] != 0 :
+                            z[j] -= math.exp(s[j][y])
+                            s[j][y] += ins.freq * di
+                            z[j] += math.exp(s[j][y])
         if callback : callback(w)
     return dict(zip(cons_ind, w))
 
