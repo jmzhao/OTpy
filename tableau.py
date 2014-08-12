@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 class constraint :
     def __init__(self, index, abbr, describe) :
         self.index = index
@@ -23,6 +24,58 @@ class data :
     def winners(self, value) :
         self._winners = value
         self._winner = tuple(value)[0]
+    def toHTML(self, rank) :
+        ''' @rank is a list of (constraint, rank) pair'''
+        stratum = dict()
+        for cons, r in rank :
+            stratum.setdefault(r, list()).append(cons)
+        s = sorted(stratum.items())
+        def head() :
+            return ('<tr>'
+            '<th class="row-title">' 
+            '<table class="input-form">'
+            '<td>Input:</td>''<td>/'+self.underlying+'/</td>'
+            '</table>'
+            '</th>'
+            +''.join((''.join('<th>'+cons.abbr+'</th>'
+                    for cons in cons_list)
+                    + '<th class="stratum-separation"></th>')
+                for _, cons_list in s)+
+            '</tr>')
+        def body() :
+            winner_vio_dict = self.candidates[self.winner]
+            distinguished = None
+            def check_cand(vio_dict, ind) :
+                global distinguished
+                if distinguished :
+                    return '<td class="grey">%s</td>'
+                if vio_dict.get(ind, 0) > winner_vio_dict.get(ind, 0) :
+                    distinguished = True
+                    return '<td class="grey">!%s</td>'
+                return '<td>%s</td>'
+            def check_cand_init() :
+                global distinguished
+                distinguished = False
+                return ''
+            return '\n'.join('<tr>%s</tr>'%(
+            '<td class="row-title">%s</td>'%(
+                '<table class="candidates">%s</table>'%(
+                    '<td>%s.</td>'%(chr(ord('a')+icand)) 
+                    + '<td>%s</td>'%(
+                        ('&#9758;'#('Ö'.encode("ascii", errors='replace')).decode("ISO-8859-1")#) 
+                        if cand==self.winner else '') 
+                        + cand)))
+            + check_cand_init()
+            + ''.join((
+                    ''.join(check_cand(vio_dict, cons.index)%(
+                            (lambda x : '*'*x if x < 5 else x)(
+                                vio_dict.get(cons.index, 0)))
+                            for cons in cons_list)
+                    + '<td class="stratum-separation"></td>')
+                    for _, cons_list in s))
+            for icand, (cand, vio_dict) in enumerate(self.candidates.items()))
+                
+        return '<table class="tableau">' + head() + body() + '</table>'
     
         
 def subtract(vio_dict1, vio_dict2) :
@@ -41,13 +94,14 @@ class InputError(Exception) :
         Exception.__init__(self, *args)
         
 class tableau :
-    def __init__(self, fname=None) :
+    def __init__(self, fname=None, string=None) :
         self.constraints = list()
         self.datum = list()
         #TODO: copier, fromFile, etc.
         if fname :
             self.readFile(fname)
-        pass
+        elif string :
+            self.readString(string)
     def get_constraint(self, index) :
         for c in self.constraints :
             if c.index == index :
@@ -128,4 +182,7 @@ class tableau :
         return mat
     def toString(self) :
         return '\n'.join('\t'.join(row) for row in self.toMat())
+    def toHTML(self, rank) :
+        return '''<link rel="stylesheet" type="text/css" href="tableau.css" />
+        '''+'<br>\n'.join(d.toHTML(rank) for d in self.datum)
         

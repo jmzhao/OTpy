@@ -4,11 +4,27 @@ import tkinter.filedialog
 import tkinter.messagebox
 import os
 import threading as th
+import time ## sleep
 
+import subprocess
+import sys
+
+if sys.platform == 'darwin':
+    def openFolder(path):
+        subprocess.check_call(['open', '--', path])
+elif sys.platform == 'linux2':
+    def openFolder(path):
+        subprocess.check_call(['gnome-open', '--', path])
+elif sys.platform == 'win32':
+    def openFolder(path):
+        subprocess.check_call(['explorer', path])
+        
 import tableau as tb
 import cd
 import fred
 import maxent
+
+res_folder = 'res'
 
 class Application(tk.Frame):
     def __init__(self, master=None):
@@ -17,6 +33,7 @@ class Application(tk.Frame):
         self.createMenubar()
         self.createWidgets()
         self.master.title("ot_py")
+        print(os.getcwd())
     
     def createMenubar(self):
         ## menu bar
@@ -38,6 +55,9 @@ class Application(tk.Frame):
         self.menuShow = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Show", menu=self.menuShow)
         self.menuShow.add_command(label="Show Hasse Diagram", command=self.z_hasse, state=tk.DISABLED)
+        self.menuShow.add_command(label="Show Tableau", command=self.z_tableau, state=tk.DISABLED)
+        self.menuShow.add_separator()
+        self.menuShow.add_command(label="Show Resouce Folder", command=self.z_folder, state=tk.NORMAL)
         ### Help
         self.menuHelp = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Help", menu=self.menuHelp)
@@ -63,11 +83,15 @@ class Application(tk.Frame):
         self.xst_output.insert(tk.END, toString(self.y_output))
         if value_dict.get('caller') == self.z_fred :
             self.menuShow.entryconfigure(0, state=tk.NORMAL)
+        if value_dict.get('caller') == self.z_cd :
+            self.menuShow.entryconfigure(1, state=tk.NORMAL)
     @y_output.deleter
     def y_output(self) :
         if hasattr(self, '_y_output') : del self._y_output
         self.xst_output.delete(1.0, tk.END)
         self.menuShow.entryconfigure(0, state=tk.DISABLED)
+        self.menuShow.entryconfigure(1, state=tk.DISABLED)
+        
     @property
     def y_input(self) :
         return self._y_input
@@ -78,11 +102,13 @@ class Application(tk.Frame):
         self.xst_input.insert(tk.END, value)
         for k in range(3) :
             self.menuRun.entryconfig(k, state=tk.NORMAL)
+        #self.menuShow.entryconfigure(1, state=tk.NORMAL)
     @y_input.deleter
     def y_input(self) :
         if hasattr(self, '_y_input') : del self._y_input
         for k in range(3) :
             self.menuRun.entryconfig(k, state=tk.DISABLED)
+        self.menuShow.entryconfigure(1, state=tk.DISABLED)
         self.xst_input.delete(1.0, tk.END)
     @property
     def y_running(self) :
@@ -99,10 +125,10 @@ class Application(tk.Frame):
         
     def z_loadFile(self) :
         ''' action for load file button '''
-        fname = tk.filedialog.askopenfile(filetypes=(("Plain text", "*.txt"),
+        f = tk.filedialog.askopenfile(filetypes=(("Plain text", "*.txt"),
                                                      ("All files", "*.*")))
-        if fname :
-            f = fname.read()
+        if f :
+            f = f.read()
             self.y_input = str(f)
             del self.y_output
     def z_cd(self) :
@@ -161,8 +187,18 @@ class Application(tk.Frame):
     def z_abort(self) :
         del self.y_running
     def z_hasse(self) :
-        fred.hasse.hasse(self.y_tab, self.y_output.SKB).write('hasse.png', format='png')
-        os.system('hasse.png')
+        fname = os.path.join(os.getcwd(), res_folder, 'hasse.png')
+        fred.hasse.hasse(self.y_tab, self.y_output.SKB).write(fname, format='png')
+        os.system(fname)
+    def z_tableau(self) :
+        fname = os.path.join(os.getcwd(), res_folder,'tableau.html')
+        f = open(fname, 'w')
+        f.write(tb.tableau(string=self.y_input).toHTML(rank=self.y_output))
+        f.close()
+        #time.sleep(0.05)
+        os.system(fname)
+    def z_folder(self) :
+        openFolder(os.path.join(os.getcwd(), res_folder))
     def z_about(self) :
         m = '''ot_py (alpha)
 7/31/2014
