@@ -1,13 +1,19 @@
 ## An implentation of Maximum Entropy model (Goldwater and Johnson 2003)
 #import scipy.optimize ## for Conjugate Gradient
+import cg
 import math
 
-def MaximumEntropy(t, method='GIS', **d) :
+def MaximumEntropy(t, method='CG', **d) :
     ''' Maximum Entropy model
-    method = 'GIS'|'SCGIS', 'GIS' is default'''
+    method = 'GIS'|'SCGIS'|'CG', 'CG' is default.
+    GIS: Generalized Iterative Scaling,
+    SCGIS: Sequential Conditional Generalized Iterative Scaling 
+        (problematic: may produce mismatching predictions),
+    CG: Nonlinear Conjugate Gradient method
+        (some critical parameter may need to be adjusted, e.g. sigma0 to achieve convergence).'''
     return {'GIS':maxent_gis,
             'SCGIS':maxent_scgis,
-            #'CG':maxent_cg, ## under construction
+            'CG':maxent_cg, ## under construction
             }.get(method)(t, **d)
 
 class __ins_object :
@@ -133,8 +139,8 @@ def maxent_scgis(t, maxiter=1000, needtrim=True, lower_lim=-50, upper_lim=0, cal
         if callback : callback(w)
     return dict(zip(cons_ind, w))
 
-def maxent_cg(t, callback=None) :
-    sigmaSquared = 1000000
+def maxent_cg(t, callback=None, mu=0, sigma=1000, **_) :
+    sigmaSquared = sigma*sigma
     cnt_examples = 0
     for d in t.datum :
         for frequency in d.winners.values() :
@@ -149,9 +155,12 @@ def maxent_cg(t, callback=None) :
             for win, frequency in d.winners.items() :
                 ans += frequency * (logw[win] - logz)
         ans /= cnt_examples
-        ans -= sum(wi*wi for wi in w) / (2*sigmaSquared)
+        ans -= sum((wi-mu)*(wi-mu) for wi in w) / (2*sigmaSquared)
         return -ans
 
     w0 = tuple(0 for _ in t.get_constraint_indices())
-
-    return scipy.optimize.fmin_cg(f, w0, callback=callback)
+    
+    ans = cg.nonlinear_cg(f, w0, callback=callback)
+#    ans = scipy.optimize.fmin_cg(f, w0, callback=callback)#, bounds=list((None, 0) for w in w0))
+    print('f(x):', f(ans))
+    return dict(enumerate(ans))

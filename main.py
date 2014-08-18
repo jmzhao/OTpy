@@ -49,7 +49,15 @@ class Application(tk.Frame):
         self.menubar.add_cascade(label="Run", menu=self.menuRun)
         self.menuRun.add_command(label="Run Constraint Demotion (CD)", command=self.z_cd, state=tk.DISABLED)
         self.menuRun.add_command(label="Run Fusional Reduction (FRed)", command=self.z_fred, state=tk.DISABLED)
-        self.menuRun.add_command(label="Run Maximum Entropy (MaxEnt)", command=self.z_maxent, state=tk.DISABLED)
+#        self.menuRun.add_command(label="Run Maximum Entropy (MaxEnt)", command=self.z_maxent, state=tk.DISABLED)
+        self.menuRunMaxent = tk.Menu(self.menuRun, tearoff=0)
+        self.menuRun.add_cascade(label="Run Maximum Entropy (MaxEnt)", menu=self.menuRunMaxent, state=tk.DISABLED)
+        self.menuRunMaxent.add_command(label="Using Generalized Iterative Scaling (GIS)", 
+                                       command=(lambda : self.z_maxent('GIS')))
+        self.menuRunMaxent.add_command(label="Using Sequential Conditional Generalized Iterative Scaling (SCGIS)", 
+                                       command=(lambda : self.z_maxent('SCGIS')))
+        self.menuRunMaxent.add_command(label="Using Nonlinear Conjugate Gradient method (CG)", 
+                                       command=(lambda : self.z_maxent('CG')))
         self.menuRun.add_separator()
         self.menuRun.add_command(label="Abort Running", command=self.z_abort, state=tk.DISABLED)
         ### Show
@@ -177,37 +185,39 @@ class Application(tk.Frame):
             tk.messagebox.showerror(title="INPUT ERROR", message=e)
         except Exception as e :
             tk.messagebox.showerror(title="ERROR", message=e)
-    def z_maxent(self) :
+    def z_maxent(self, method) :
         ''' actiion for Maximum Entropy button '''
+        t = tb.tableau()
+        try :
+            t.readString(self.y_input)
+        except tb.InputError as e :
+            tk.messagebox.showerror(title="INPUT ERROR", message=e)
         cnt = [0]
+        repgap = max(1, int((100 if method=='CG' else 2000 ) / len(t.constraints)))
         self.z_abort = False
         def rep(w) :
             cnt[0] += 1
-            if cnt[0] % 100 == 0 :
+            if cnt[0] % repgap == 0 :
                 self.y_output = 'Iteration count: %d\n'%(cnt[0])
             if self.z_abort : 
                 self.y_output = 'Aborted.'
                 raise KeyboardInterrupt
-        t = tb.tableau()
         try :
-            t.readString(self.y_input)
             self.queue = queue.Queue()
             def task() :
                 try :
-                    ans = maxent.MaximumEntropy(t, callback=rep)
+                    ans = maxent.MaximumEntropy(t, method=method, callback=rep)
                     def toString(a) :
                         s = sorted(
                             ((t.get_constraint(index=i).abbr, -w) for i, w in a.items()), 
                             key=(lambda a:a[1]), reverse=True)
                         return '\n'.join(('%'+str(max(len(abbr) for abbr, _ in s))+'s\t%s')%x for x in s)
-                    self.y_output = {'caller':self.z_maxent, 'value':ans, 'toString':toString}
+                    self.y_output = {'caller':self.z_maxent, 'value':ans, 'toString':toString, 'method':method}
                 except Exception as e :
                     self.y_error = e
             self.y_running = th.Thread(target=task)
             self.y_running.start()
             self.process_queue()
-        except tb.InputError as e :
-            tk.messagebox.showerror(title="INPUT ERROR", message=e)
         except Exception as e :
             tk.messagebox.showerror(title="ERROR", message=e)
     def z_abort(self) :
@@ -217,11 +227,13 @@ class Application(tk.Frame):
         fred.hasse.hasse(self.y_tab, self.y_output.SKB).write(fname, format='png')
         th.Thread(target=os.system, args=(fname,)).start()
     def z_tableau(self) :
-        aff = self._y_output['caller'].__name__[2:]
+        caller = self._y_output['caller'].__name__[2:]
+        method = self._y_output.get('method')
+        aff = caller+'_'+method if method else caller
         print('in z_tableau: aff="%s"'%(aff))
         fname = os.path.join(os.getcwd(), res_folder,'tableau_%s.html'%(aff))
         f = open(fname, 'w')
-        f.write(tb.tableau(string=self.y_input).toHTML(**{aff:self.y_output}))
+        f.write(tb.tableau(string=self.y_input).toHTML(**{caller:self.y_output}))
         f.close()
         #time.sleep(0.05)
         th.Thread(target=os.system, args=(fname,)).start()
@@ -229,7 +241,7 @@ class Application(tk.Frame):
         openFolder(os.path.join(os.getcwd(), res_folder))
     def z_about(self) :
         m = '''ot_py (alpha)
-7/31/2014
+8/17/2014
         '''
         tk.messagebox.showinfo(title="About", message=m)
 
