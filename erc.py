@@ -90,6 +90,7 @@ def get_ERClist(tab) :
     ans = set()
     for data in tab.datum :
         for cand in data.candidates :
-            if cand != data.winner :
-                ans.add(toERC(data.candidates[cand], data.candidates[data.winner]))
+            if cand not in data.winners :
+                for winner in data.winners :
+                    ans.add(toERC(data.candidates[cand], data.candidates[winner]))
     return ans

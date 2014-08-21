@@ -34,7 +34,7 @@ class Application(tk.Frame):
         self.createMenubar()
         self.createWidgets()
         self.master.title("ot_py")
-        print(os.getcwd())
+        print('working directory:', os.getcwd())
     
     def createMenubar(self):
         ## menu bar

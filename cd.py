@@ -17,29 +17,31 @@ def ConstraintsDemotion(t) :
     def find_dominated() :
         dominated_set = set()
         for data in t.datum :
-            winner_constraint = data.candidates[data.winner]
-            for s in data.candidates :
-                if s != data.winner :
-                    s_constraint = data.candidates[s]
-                    dominated_constraint = subtract(winner_constraint, s_constraint)
-                    #print(winner_constraint, s_constraint, dominated_constraint)
-                    ## assert subtract(s_constraint, winner_constraint) not empty
-                    ## this is garanteed if there is no harmonically bounded winner
-                    dominated_set.update(dominated_constraint)
+            for winner in data.winners :
+                winner_constraint = data.candidates[winner]
+                for s in data.candidates :
+                    if s not in data.winners :
+                        s_constraint = data.candidates[s]
+                        dominated_constraint = subtract(winner_constraint, s_constraint)
+                        #print(winner_constraint, s_constraint, dominated_constraint)
+                        ## assert subtract(s_constraint, winner_constraint) not empty
+                        ## this is garanteed if there is no harmonically bounded winner
+                        dominated_set.update(dominated_constraint)
         return dominated_set
     def discard(dominated_indices, undominated_indices) :
         t.constraints = [t.get_constraint(index=i) for i in dominated_indices]
         #print(t.get_constraint_indices())
         for d in t.datum :
-            winner_vio_dict = d.candidates[d.winner]
-            for cand, vio_dict in list(d.candidates.items()) :
-                if (cand != d.winner
-                and len(set(subtract(vio_dict, winner_vio_dict)).intersection(undominated_indices))) > 0 :
-                    ## this candidate can be explained by undominated constraints
-                    d.candidates.pop(cand)
-            assert len(d.candidates) > 0 ## at least the winner should be left
+            for winner in d.winners :
+                winner_vio_dict = d.candidates[winner]
+                for cand, vio_dict in list(d.candidates.items()) :
+                    if (cand not in d.winners
+                    and len(set(subtract(vio_dict, winner_vio_dict)).intersection(undominated_indices))) > 0 :
+                        ## this candidate can be explained by undominated constraints
+                        d.candidates.pop(cand)
+            assert len(d.candidates) >=  len(d.winners)## at least the winner(s) should be left
         ## discard the group that only has the winner candidate
-        t.datum = [d for d in t.datum if len(d.candidates) > 1]
+        t.datum = [d for d in t.datum if len(d.candidates) > len(d.winners)]
                 
     ans = list()
     stratum_no = 1

@@ -29,13 +29,15 @@ class dataMixin :#(tb.data) :
                 for _, cons_list in s)+
             '</tr>')
         def body() :
-            winner_vio_dict = self.candidates[self.winner]
+            def winner_vio_dict_get(ind, v) :
+                return max(self.candidates[winner].get(ind, v) 
+                    for winner in self.winners)
             distinguished = None
             def check_cand(vio_dict, ind) :
                 global distinguished
                 if distinguished :
                     return '<td class="in-stratum grey">%s</td>'
-                if vio_dict.get(ind, 0) > winner_vio_dict.get(ind, 0) :
+                if vio_dict.get(ind, 0) > winner_vio_dict_get(ind, 0) :
                     distinguished = True
                     return '<td class="in-stratum grey">!%s</td>'
                 return '<td class="in-stratum">%s</td>'
@@ -49,7 +51,7 @@ class dataMixin :#(tb.data) :
                     '<td>%s.</td>'%(chr(ord('a')+icand)) 
                     + '<td>%s</td>'%(
                         ('&#9758;'#('Ö'.encode("ascii", errors='replace')).decode("ISO-8859-1")#) 
-                        if cand==self.winner else '') 
+                        if cand in self.winners else '') 
                         + cand)))
             + check_cand_init()
             + ''.join((

@@ -12,13 +12,14 @@ class data(tab2html.dataMixin) :
         self.candidates = dict()
         self._winners = dict()
         self._winner = None
-    @property
-    def winner(self) :
-        return self._winner
-    @winner.setter
-    def winner(self, value) :
-        self._winner = value
-        self.winners = {value:1}
+    ## following is obsolete
+#    @property
+#    def winner(self) :
+#        return self._winner
+#    @winner.setter
+#    def winner(self, value) :
+#        self._winner = value
+#        self.winners = {value:1}
     @property
     def winners(self) :
         return self._winners
@@ -80,15 +81,16 @@ class tableau(tab2html.tableauMixin) :
             ''' put information for one input into the structure '''
             if onedata != None : ## indeed has extracted data
                 onedata.winners = onedata.winners ## this is a bit odd, see getter and setter
-                if onedata.winner == None : ## has no winner candidate
+                if len(onedata.winners) == 0 : ## has no winner candidate
                     raise InputError('no winner form for underlying form "%s"'%(onedata.underlying) )
                 else :
-                    winner_vio_dict = onedata.candidates[onedata.winner]
-                    for can, vio_dict in onedata.candidates.items() :
-                        if ( can != onedata.winner
-                        and len(subtract(vio_dict, winner_vio_dict)) == 0 ) :
-                            raise InputError('winner candidate "%(win)s is" harmonically bounded by "%(can)s" with underlying form "%(und)s"'
-                            %{'win':onedata.winner, 'can':can, 'und':onedata.underlying})
+                    for winner in onedata.winners :
+                        winner_vio_dict = onedata.candidates[winner]
+                        for can, vio_dict in onedata.candidates.items() :
+                            if ( can not in onedata.winners
+                            and len(subtract(vio_dict, winner_vio_dict)) == 0 ) :
+                                raise InputError('winner candidate "%(win)s is" harmonically bounded by "%(can)s" with underlying form "%(und)s"'
+                                %{'win':winner, 'can':can, 'und':onedata.underlying})
                 self.datum.append(onedata)
         onedata = None ## store the data for current underlying form
         for line in mat[2:] : ## data start from 3rd row
@@ -124,9 +126,12 @@ class tableau(tab2html.tableauMixin) :
                 for can, vio_dict in d.candidates.items()]
             onemat[0][0] = d.underlying
             for i in range(len(onemat)) :
-                if onemat[i][1] == d.winner :
-                    onemat[i][2] = '1'
-                    break
+                cand = onemat[i][1]
+                if cand in d.winners :
+                    v = d.winners[cand]
+                    if round(v) == v : v = int(v)
+                    onemat[i][2] = str(v)
+                    
             mat.extend(onemat)
         return mat
     def toString(self) :
