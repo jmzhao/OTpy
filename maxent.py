@@ -111,7 +111,10 @@ def maxent_scgis(t, maxiter=1000, needtrim=True, lower_lim=-50, upper_lim=0, cal
         def trim(w) :
             return max(min(w, upper_lim), lower_lim)
     else :
-        def trim(w) : return w
+        def trim(w) : 
+            return w
+    toupper = upper_lim - lower_lim
+    tolower = - toupper
     
     w = list(all0)
     z = list(len(ins.cand) for ins in instance)
@@ -123,7 +126,9 @@ def maxent_scgis(t, maxiter=1000, needtrim=True, lower_lim=-50, upper_lim=0, cal
                     for y, c in enumerate(ins.cand) if c.vio[i] != 0)
                 for j, ins in enumerate(instance))
             if observed[i] != 0 :
-                di = math.log(observed[i]/expectedi) / sf_list[i]
+                #print('expectedi:', expectedi)
+                di = (math.log(observed[i]/expectedi) / sf_list[i]
+                    if expectedi > 0 else toupper)
                 wi = trim(w[i]+di)
             else : 
                 wi = lower_lim
@@ -134,7 +139,7 @@ def maxent_scgis(t, maxiter=1000, needtrim=True, lower_lim=-50, upper_lim=0, cal
                     for y, c in enumerate(ins.cand) :
                         if c.vio[i] != 0 :
                             z[j] -= math.exp(s[j][y])
-                            s[j][y] += ins.freq * di
+                            s[j][y] += di * c.vio[i]
                             z[j] += math.exp(s[j][y])
         if callback : callback(w)
     return dict(zip(cons_ind, w))
