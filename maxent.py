@@ -1,16 +1,27 @@
-## An implentation of Maximum Entropy model (Goldwater and Johnson 2003)
-#import scipy.optimize ## for Conjugate Gradient
-import cg
+## An implentation of several algorithms for training Maximum Entropy model,
+## including:
+## Generalized Iterative Scaling (described in Goodman 2002) 
+## Sequential Conditional Generalized Iterative Scaling (as above)
+## maximize Log Likelihood using (Nonlinaer) Conjugate Gradient method (Goldwater & Johnson 2003)
+
+
+#import scipy.optimize ## for Conjugate Gradient ## no longer needed
+import cg ## my handmade CG
 import math
 
 def MaximumEntropy(t, method='CG', **d) :
     ''' Maximum Entropy model
     method = 'GIS'|'SCGIS'|'CG', 'CG' is default.
+    
     GIS: Generalized Iterative Scaling,
-    SCGIS: Sequential Conditional Generalized Iterative Scaling 
-        (problematic: may produce mismatching predictions),
-    CG: Nonlinear Conjugate Gradient method
-        (some critical parameter may need to be adjusted, e.g. sigma0 to achieve convergence).'''
+        (described in Goodman 2002)
+    SCGIS: Sequential Conditional Generalized Iterative Scaling, 
+        (Goodman 2002)
+        //problem _scgis1: may produce mismatching predictions (This is solved. 
+        See comments in maxent_scgis.)
+    CG: Nonlinear Conjugate Gradient method,
+        (Goldwater & Johnson 2003)
+        Some critical parameter may need to be adjusted, e.g. sigma0 to achieve convergence.'''
     return {'GIS':maxent_gis,
             'SCGIS':maxent_scgis,
             'CG':maxent_cg, ## under construction
@@ -139,8 +150,14 @@ def maxent_scgis(t, maxiter=1000, needtrim=True, lower_lim=-50, upper_lim=0, cal
                     for y, c in enumerate(ins.cand) :
                         if c.vio[i] != 0 :
                             z[j] -= math.exp(s[j][y])
-                            s[j][y] += di * c.vio[i]
+                            s[j][y] += di * c.vio[i] 
+                            ## facter $c.vio[i] is not presented in the psuadecode (Figure 2, Goodman 2002)
+                            ## After adding this, problem _scgis1 solved.
                             z[j] += math.exp(s[j][y])
+            ## Due to the cumulative float point error, the value of $z and $s  
+            ## may need to be recalculated by definition after every several 
+            ## iterations or when the error will cause an notable harm to con-
+            ## vergence. The suitable timing is left to be determined.
         if callback : callback(w)
     return dict(zip(cons_ind, w))
 
