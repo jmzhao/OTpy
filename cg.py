@@ -27,8 +27,9 @@ def linear_secant(fprime, x, d, tol, maxiter, sigma0) :
     ita_prev = dot(d, fprime(tuple(xi+sigma0*di for xi,di in zip(x,d))))
     for __ in range(maxiter) :
         ita = dot(d, fprime(x))
-        alpha *= ita / (ita_prev - ita)
-#        if abs(alpha / alpha_old) > 1 : break
+        rat = ita / (ita_prev - ita)
+        if __ > 0 and abs(rat) > 1 : break
+        alpha *= rat
         print('alpha:', alpha)
         x = tuple(xi + alpha * di for xi, di in zip(x, d))
         if alpha*alpha*delta_d < tol :
@@ -36,7 +37,9 @@ def linear_secant(fprime, x, d, tol, maxiter, sigma0) :
     return alpha, x
     
 def nonlinear_cg(f, x0, fprime=None, epsilon=epsilon, tol=1e-9, maxiter=None, 
-                 linear_tol=1e-5, linear_maxiter=4, sigma0=0.1, approx_hessian=False,
+                 linear=linear_secant, linear_tol=1e-5, linear_maxiter=4, 
+                     sigma0=0.1, 
+                     approx_hessian=False,
                  callback=None) :
     """
     Minimize a function using a nonlinear conjugate gradient algorithm
@@ -104,12 +107,15 @@ def nonlinear_cg(f, x0, fprime=None, epsilon=epsilon, tol=1e-9, maxiter=None,
     for _ in range(maxiter) :
         print('iter:', _)
         print('delta_new:', delta_new , tol * delta_0)
-        if delta_new < tol * delta_0 :
+        if delta_new < tol :#* delta_0 :
 #        print('abs:', abs(delta_new - delta_old))
 #        if abs(delta_new - delta_old) < tol :
             break
-#        alpha, x = linear_newton(fprime, fhess_p, x, d, linear_tol, linear_maxiter)
-        alpha, x = linear_secant(fprime, x, d, linear_tol, linear_maxiter, sigma0)
+        if linear == linear_secant :
+            alpha, x = linear_secant(fprime, x, d, linear_tol, linear_maxiter, sigma0)
+        else :
+            alpha, x = linear_newton(fprime, fhess_p, x, d, linear_tol, linear_maxiter)
+        #x = tuple(min(0,xi) for xi in x)
         r_old = r
         r = tuple(-xi for xi in fprime(x))
         delta_old = delta_new

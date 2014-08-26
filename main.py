@@ -24,8 +24,7 @@ import tableau as tb
 import cd
 import fred
 import maxent
-
-res_folder = 'res'
+import cfg
 
 class Application(tk.Frame):
     def __init__(self, master=None):
@@ -35,6 +34,7 @@ class Application(tk.Frame):
         self.createWidgets()
         self.master.title("ot_py")
         print('working directory:', os.getcwd())
+        self.checkFiles()
     
     def createMenubar(self):
         ## menu bar
@@ -44,6 +44,8 @@ class Application(tk.Frame):
         self.menuFile = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="File", menu=self.menuFile)
         self.menuFile.add_command(label="Open", command=self.z_loadFile)
+        self.menuFile.add_separator()
+        self.menuFile.add_command(label="Config", command=self.z_config)
         ### Run
         self.menuRun = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Run", menu=self.menuRun)
@@ -79,6 +81,13 @@ class Application(tk.Frame):
         ## scrolled text feild to show output content
         self.xst_output = tk.scrolledtext.ScrolledText(self, width=60, wrap="none")
         self.xst_output.pack(side=tk.RIGHT, expand=True, fill=tk.BOTH)
+    
+    def checkFiles(self) :
+        self.f_cwd = os.getcwd()
+        self.f_res_folder = 'res'
+        self.f_fcfg = self.getResouceFileName('config.ini')
+    def getResouceFileName(self, *args) :
+        return os.path.join(self.f_cwd, self.f_res_folder, *args)
     
     @property  
     def y_output(self) :
@@ -146,6 +155,9 @@ class Application(tk.Frame):
             f = f.read()
             self.y_input = str(f)
             del self.y_output
+    def z_config(self) :
+        ''' open config file '''
+        os.system(self.f_fcfg)
     def z_cd(self) :
         ''' actiion for Constraint Demotion button '''
         del self.y_output
@@ -158,26 +170,40 @@ class Application(tk.Frame):
         except Exception as e :
             tk.messagebox.showerror(title="ERROR", message=e)
             #self.ysv_errmsg.set('ERROR: '+str(e))
+    def init_queue(self) :
+        self.queue_output = queue.Queue()
+        self.queue_error = queue.Queue()
+    def put_queue(self, d) :
+        if isinstance(d, Exception) :
+            self.queue_error.put(d)
+        else :
+            self.queue_output.put(d)
     def process_queue(self) :
         try :
-            e = self.queue.get(0)
+            while True :
+                try :
+                    e = self.queue_output.get(0)
+                    self.y_output = e
+                except queue.Empty :
+                    break
+            e = self.queue_error.get(0)
             tk.messagebox.showerror(title="ERROR", message=e)      
         except queue.Empty :
-            self.master.after(100, self.process_queue)
+            self.master.after(50, self.process_queue)
             
     def z_fred(self) :
         ''' actiion for Fusional Reduction button '''
         self.y_output = {'value':'computing...'}
         t = tb.tableau()
+        self.init_queue()
         try :
             t.readString(self.y_input)
             self.y_tab = t
-            self.queue = queue.Queue()
             def task() :
                 try :
-                    self.y_output = {'caller':self.z_fred, 'value':fred.FRed(fred.erc.get_ERClist(t))}
+                    self.put_queue({'caller':self.z_fred, 'value':fred.FRed(fred.erc.get_ERClist(t))})
                 except Exception as e :
-                    self.queue.put(e)
+                    self.put_queue(e)
             self.y_running = th.Thread(target=task)
             self.y_running.start()
             self.process_queue()
@@ -190,31 +216,35 @@ class Application(tk.Frame):
         t = tb.tableau()
         try :
             t.readString(self.y_input)
+            dcfg = cfg.get_config_as_dict(self.f_fcfg)
         except tb.InputError as e :
             tk.messagebox.showerror(title="INPUT ERROR", message=e)
+        except Exception as e :
+            tk.messagebox.showerror(title="ERROR", message=e)
+        self.init_queue()
         cnt = [0]
         repgap = max(1, int((100 if method=='CG' else 2000 ) / len(t.constraints)))
         self.z_abort = False
         def rep(w) :
             cnt[0] += 1
             if cnt[0] % repgap == 0 :
-                self.y_output = 'Iteration count: %d\n'%(cnt[0])
+                self.put_queue('Iteration count: %d\n'%(cnt[0]))
             if self.z_abort : 
-                self.y_output = 'Aborted.'
+                self.put_queue('Aborted.')
                 raise KeyboardInterrupt
         try :
             self.queue = queue.Queue()
             def task() :
                 try :
-                    ans = maxent.MaximumEntropy(t, method=method, callback=rep)
+                    ans = maxent.MaximumEntropy(t, method=method, callback=rep, **dcfg[method])
                     def toString(a) :
                         s = sorted(
                             ((t.get_constraint(index=i).abbr, -w) for i, w in a.items()), 
                             key=(lambda a:a[1]), reverse=True)
                         return '\n'.join(('%'+str(max(len(abbr) for abbr, _ in s))+'s\t%s')%x for x in s)
-                    self.y_output = {'caller':self.z_maxent, 'value':ans, 'toString':toString, 'method':method}
+                    self.put_queue({'caller':self.z_maxent, 'value':ans, 'toString':toString, 'method':method})
                 except Exception as e :
-                    self.y_error = e
+                    self.put_queue(e)
             self.y_running = th.Thread(target=task)
             self.y_running.start()
             self.process_queue()
@@ -223,7 +253,7 @@ class Application(tk.Frame):
     def z_abort(self) :
         self.z_abort = True
     def z_hasse(self) :
-        fname = os.path.join(os.getcwd(), res_folder, 'hasse.png')
+        fname = self.getResouceFileName('hasse.png')
         fred.hasse.hasse(self.y_tab, self.y_output.SKB).write(fname, format='png')
         th.Thread(target=os.system, args=(fname,)).start()
     def z_tableau(self) :
@@ -231,17 +261,17 @@ class Application(tk.Frame):
         method = self._y_output.get('method')
         aff = caller+'_'+method if method else caller
         print('in z_tableau: aff="%s"'%(aff))
-        fname = os.path.join(os.getcwd(), res_folder,'tableau_%s.html'%(aff))
+        fname = self.getResouceFileName('tableau_%s.html'%(aff))
         f = open(fname, 'w')
         f.write(tb.tableau(string=self.y_input).toHTML(**{caller:self.y_output}))
         f.close()
         #time.sleep(0.05)
         th.Thread(target=os.system, args=(fname,)).start()
     def z_folder(self) :
-        openFolder(os.path.join(os.getcwd(), res_folder))
+        openFolder(self.getResouceFileName())
     def z_about(self) :
         m = '''ot_py (alpha)
-8/17/2014
+8/21/2014
         '''
         tk.messagebox.showinfo(title="About", message=m)
 

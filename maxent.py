@@ -4,10 +4,11 @@
 ## Sequential Conditional Generalized Iterative Scaling (as above)
 ## maximize Log Likelihood using (Nonlinaer) Conjugate Gradient method (Goldwater & Johnson 2003)
 
+import math
+import warnings
 
 #import scipy.optimize ## for Conjugate Gradient ## no longer needed
 import cg ## my handmade CG
-import math
 
 def MaximumEntropy(t, method='CG', **d) :
     ''' Maximum Entropy model
@@ -75,8 +76,10 @@ def get_maxent_input(t) :
     print(ans)
     return ans
             
-def maxent_gis(t, maxiter=1000, needtrim=True, lower_lim=-50, upper_lim=0, callback=None) :
+def maxent_gis(t, maxiter=10000, needtrim=True, lower_lim=-50, upper_lim=0, 
+               callback=None, **unknown_opt) :
     '''Generrized Iterative Scaling'''
+    _check_unknown_options(unknown_opt)
     inp = get_maxent_input(t)
     instance = inp['ins']
     observed = inp['obs']
@@ -109,8 +112,10 @@ def maxent_gis(t, maxiter=1000, needtrim=True, lower_lim=-50, upper_lim=0, callb
         if callback : callback(w)
     return dict(zip(cons_ind, w))
 
-def maxent_scgis(t, maxiter=1000, needtrim=True, lower_lim=-50, upper_lim=0, callback=None) :
+def maxent_scgis(t, maxiter=10000, needtrim=True, lower_lim=-50, upper_lim=0, 
+                 callback=None, **unknown_opt) :
     '''Sequential Conditional Generalized Iterative Scaling'''
+    _check_unknown_options(unknown_opt)
     inp = get_maxent_input(t)
     instance = inp['ins']
     observed = inp['obs']
@@ -161,28 +166,64 @@ def maxent_scgis(t, maxiter=1000, needtrim=True, lower_lim=-50, upper_lim=0, cal
         if callback : callback(w)
     return dict(zip(cons_ind, w))
 
-def maxent_cg(t, callback=None, mu=0, sigma=1000, **_) :
-    sigmaSquared = sigma*sigma
-    cnt_examples = 0
-    for d in t.datum :
-        for frequency in d.winners.values() :
-            cnt_examples += frequency
+def maxent_cg(t, prior=None, trim0=False,
+              epsilon=cg.epsilon, tol=1e-9, maxiter=None, 
+              linear=cg.linear_secant, linear_tol=1e-5, linear_maxiter=4, sigma0=0.01, approx_hessian=False, 
+              callback=None, **unknown_opt) :
+    _check_unknown_options(unknown_opt)
+#    cnt_examples = 0
+#    for d in t.datum :
+#        for frequency in d.winners.values() :
+#            cnt_examples += frequency
+    inp = get_maxent_input(t)
+    instance = inp['ins']
+    #observed = inp['obs']
+    cons_ind = inp['ind']
+    #all0 = list(0 for _ in cons_ind)
+    #cons_n = len(cons_ind)
+    if prior == None : prior = lambda _ : 0
+    def sqr(x) : return x*x
+    
+    co = list(1 for _ in cons_ind)
     def f(w) :
         ans = 0
-        for d in t.datum :
-            logw = dict() ## Sigma_{i=1}^{m}w_i*f_i(y,x) in fomula (1)
-            for cand, vio_dict in d.candidates.items() :
-                logw[cand] = sum(w[index]*degree for index, degree in vio_dict.items())
-            logz = math.log(sum(math.exp(x) for x in logw.values()))
-            for win, frequency in d.winners.items() :
-                ans += frequency * (logw[win] - logz)
-        ans /= cnt_examples
-        ans -= sum((wi-mu)*(wi-mu) for wi in w) / (2*sigmaSquared)
-        return -ans
+        w = tuple(wi if coi > 0 else 0 for wi, coi in zip(w, co))
+        for ins in instance :
+            logw = tuple(sum(wi*fi 
+                    for wi, fi in zip(w, c.vio) if fi != 0)
+                for c in ins.cand)
+            #print('logw:', logw)
+            logz = math.log(sum(math.exp(x) for x in logw))
+            #print('logz:', logz)
+            ans += sum(c.freq * logwi 
+                for logwi, c in zip(logw, ins.cand) if c.freq != 0)
+            ans -= ins.freq * logz
+        return ans
 
     w0 = tuple(0 for _ in t.get_constraint_indices())
     
-    ans = cg.nonlinear_cg(f, w0, callback=callback)
+    fcg = lambda w : - f(w) + prior(w)
+    cg_opt = {'epsilon':epsilon, 'tol':tol, 'maxiter':maxiter, 
+              'linear':linear, 'linear_tol':linear_tol, 'linear_maxiter':linear_maxiter, 
+              'sigma0':sigma0, 'approx_hessian':approx_hessian, 
+              'callback':callback}
+    while True :
+        ans = cg.nonlinear_cg(fcg, w0, **cg_opt)
+        icons, w = max(enumerate(ans), key=lambda x:x[1])
+        if w <= 0 or not trim0 : break
+        co[icons] = 0
 #    ans = scipy.optimize.fmin_cg(f, w0, callback=callback)#, bounds=list((None, 0) for w in w0))
     print('f(x):', f(ans))
-    return dict(enumerate(ans))
+    
+    return dict(zip(cons_ind, ans))
+    
+## extracted from scipy.optimize
+class MaxentWarning(UserWarning) :
+    pass
+def _check_unknown_options(unknown_options):
+    if unknown_options:
+        msg = ", ".join(map(str, unknown_options.keys()))
+        # Stack level 4: this is called from _minimize_*, which is
+        # called from another function in Scipy. Level 4 is the first
+        # level in user code.
+        warnings.warn("Unknown solver options: %s" % msg, MaxentWarning, 4)

@@ -6,6 +6,10 @@ import tableau as tb
 import cd
 import fred
 import maxent
+import cfg
+
+cfg = cfg.get_config_as_dict('res\\config.ini')
+print(cfg)
 
 t = tb.tableau()
 
@@ -18,13 +22,15 @@ def test(fname) :
         print(*(cand.abbr for cand in t.constraints))
         #print(*(d.candidates for d in t.datum))
         ## MaxEnt
-        ans = maxent.MaximumEntropy(t, method='SCGIS', callback=print, maxiter=10000, needtrim=True)
+        method='SCGIS'
+        ans = maxent.MaximumEntropy(t, method=method, trim0=True, tol=1e-6)#, **cfg[method])
+        #ans = {0:-233, 1:-88, 2:92}
         print(*sorted((w, t.get_constraint(index=i).abbr) 
                     for i, w in (ans).items()),
             sep='\n')
         ### Tableau
         fhtml='res\\tableau_maxent.html'
-        print(tb.tableau(fname).toHTML(maxent=ans), file=open(fhtml,'w'))
+        print(tb.tableau(fname).toHTML(maxent=ans, **cfg['HTML']), file=open(fhtml,'w'))
         th.Thread(target=os.system, args=(fhtml,)).start()
         ## FRed
 #        ercs = fred.erc.get_ERClist(t)
@@ -51,6 +57,7 @@ def test(fname) :
 #test('''.\InputFiles\contradiction.txt''')
 #test('''.\InputFiles\HarmonicallyBounded.txt''')
 #test('''.\InputFiles\Ilokano.txt''')
-#test('''.\InputFiles\Hebrew.txt''')
-test('''.\InputFiles\IlokanoBoersmaHayes.txt''')
+test('''.\InputFiles\Hebrew.txt''')
+#test('''.\InputFiles\IlokanoBoersmaHayes.txt''')
 #test('''.\InputFiles\AssassinateStupidTheory.txt''')
+#test('''.\InputFiles\Maxent.txt''')
