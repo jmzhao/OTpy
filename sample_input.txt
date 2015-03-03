@@ -1,0 +1,10 @@
+			*No Onset	*Coda	Max(t)	Dep(?)
+			*NoOns	*Coda	Max	Dep
+a	?a	 1 				 1 
+	a		 1 			
+tat	ta	 1 			 1 	
+	tat			 1 		
+at	?a	 1 			 1 	 1 
+	?at			 1 		 1 
+	a		 1 		 1 	
+	at		 1 	 1 		
