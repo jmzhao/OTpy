@@ -4,8 +4,9 @@ import tkinter.filedialog
 import tkinter.messagebox
 import os
 import threading as th
-#import time ## sleep
+import time ## ctime
 import queue
+import webbrowser as wbb
 
 ## open a folder in window cross-platformly
 import subprocess
@@ -26,13 +27,29 @@ import fred
 import maxent
 import cfg
 
+def timing(func, *arg, **dic) :
+    t0 = time.clock()
+    ans = func(*arg, **dic)
+    t1 = time.clock()
+    return ans, t1-t0
+
 class Application(tk.Frame):
     def __init__(self, master=None):
         tk.Frame.__init__(self, master)
+        self.y_info = {
+            'libname':  'ot_py',
+            'appname':  "OTpy",
+            'version':  '0.3.1',
+            'build':    '140828',
+            'author':   'jmzhao',
+            'github':   'https://github.com/jmzhao/ot_py'
+        }
+        self.y_datainfo = {}
+        
         self.pack()
         self.createMenubar()
         self.createWidgets()
-        self.master.title("ot_py")
+        self.master.title(self.y_info['appname'])
         print('working directory:', os.getcwd())
         self.checkFiles()
     
@@ -149,22 +166,42 @@ class Application(tk.Frame):
         
     def z_loadFile(self) :
         ''' action for load file button '''
-        f = tk.filedialog.askopenfile(filetypes=(("Plain text", "*.txt"),
-                                                     ("All files", "*.*")))
-        if f :
-            f = f.read()
-            self.y_input = str(f)
-            del self.y_output
+        fpath = tk.filedialog.askopenfilename(
+            filetypes=(("Plain text", "*.txt"),
+                       ("All files", "*.*")))
+        fdir, fname = os.path.split(fpath)
+        fnamebase, fnameext = os.path.splitext(fname)
+        self.y_datainfo.update({
+            'inputpath':    fpath,
+            'inputdir':     fdir,
+            'inputname':    fname,
+            'inputnamebase': fnamebase,
+            'inputnameext': fnameext,
+        })
+        resdir = self.getResouceFileName(fnamebase)
+        if not os.path.exists(resdir) :
+            os.makedirs(resdir)
+        try :
+            f = open(fpath)
+        except Exception as e :
+            tk.messagebox.showerror(title="INPUT ERROR", message=e)
+            return 
+        f = f.read()
+        self.y_input = str(f)
+        del self.y_output
     def z_config(self) :
         ''' open config file '''
-        os.system(self.f_fcfg)
+        fname = '"%s"'%self.f_fcfg
+        th.Thread(target=os.system, args=(fname,)).start()
+#        os.system(fname)
     def z_cd(self) :
         ''' actiion for Constraint Demotion button '''
         del self.y_output
         t = tb.tableau()
         try :
             t.readString(self.y_input)
-            self.y_output = {'caller':self.z_cd, 'value':cd.ConstraintsDemotion(t), 'toString':cd.toString}
+            ans, tim = timing(cd.ConstraintsDemotion, t)
+            self.y_output = {'caller':self.z_cd, 'value':ans, 'time':tim, 'toString':cd.toString}
         except tb.InputError as e :
             tk.messagebox.showerror(title="INPUT ERROR", message=e)
         except Exception as e :
@@ -201,7 +238,8 @@ class Application(tk.Frame):
             self.y_tab = t
             def task() :
                 try :
-                    self.put_queue({'caller':self.z_fred, 'value':fred.FRed(fred.erc.get_ERClist(t))})
+                    ans, tim = timing(fred.FRed, fred.erc.get_ERClist(t))
+                    self.put_queue({'caller':self.z_fred,  'value':ans, 'time':tim,})
                 except Exception as e :
                     self.put_queue(e)
             self.y_running = th.Thread(target=task)
@@ -236,13 +274,16 @@ class Application(tk.Frame):
             self.queue = queue.Queue()
             def task() :
                 try :
-                    ans = maxent.MaximumEntropy(t, method=method, callback=rep, **dcfg[method])
+                    ans, tim = timing(maxent.MaximumEntropy, t, 
+                                    method=method, callback=rep, **dcfg[method])
                     def toString(a) :
                         s = sorted(
                             ((t.get_constraint(index=i).abbr, -w) for i, w in a.items()), 
                             key=(lambda a:a[1]), reverse=True)
                         return '\n'.join(('%'+str(max(len(abbr) for abbr, _ in s))+'s\t%s')%x for x in s)
-                    self.put_queue({'caller':self.z_maxent, 'value':ans, 'toString':toString, 'method':method})
+                    self.put_queue({
+                        'caller':self.z_maxent, 'value':ans, 'time':tim,
+                        'toString':toString, 'method':method})
                 except Exception as e :
                     self.put_queue(e)
             self.y_running = th.Thread(target=task)
@@ -252,27 +293,47 @@ class Application(tk.Frame):
             tk.messagebox.showerror(title="ERROR", message=e)
     def z_abort(self) :
         self.z_abort = True
+    def z_HTMLheader(self) :
+        caller = self._y_output['caller'].__name__[2:]
+        method = self._y_output.get('method')
+        return ('''<h1>%(appname)s</h1>
+        <p>ver%(version)s build%(build)s</p>'''%self.y_info
+        +'<ul>'
+        +'<li>Input file: %(inputpath)s</li>'%self.y_datainfo
+        +'<li>Algorithm: %s</li>'%(caller + (' using %s'%method if caller=='maxent' else ''))
+        +'<li>Running time: %(time)fs</li>'%(self._y_output)        
+        +'<li>Page generated at: %s</li>'%time.ctime()
+        +'</ul>')
     def z_hasse(self) :
-        fname = self.getResouceFileName('hasse.png')
+        fname = self.getResouceFileName(self.y_datainfo['inputnamebase'], 'hasse.png')
         fred.hasse.hasse(self.y_tab, self.y_output.SKB).write(fname, format='png')
-        th.Thread(target=os.system, args=(fname,)).start()
+        fhtml = self.getResouceFileName(self.y_datainfo['inputnamebase'], 'hasse.html')        
+        f = open(fhtml, 'w')
+        f.write(self.z_HTMLheader())
+        f.write('<h2>Hasse Diagram</h2>'
+            +'<img src="./hasse.png" />')
+        f.close()
+#        th.Thread(target=os.system, args=(fname,)).start()
+        wbb.open_new_tab(fhtml)
     def z_tableau(self) :
         caller = self._y_output['caller'].__name__[2:]
         method = self._y_output.get('method')
         aff = caller+'_'+method if method else caller
         print('in z_tableau: aff="%s"'%(aff))
-        fname = self.getResouceFileName('tableau_%s.html'%(aff))
-        f = open(fname, 'w')
+        fhtml = self.getResouceFileName(self.y_datainfo['inputnamebase'], 'tableau_%s.html'%(aff))
+        f = open(fhtml, 'w')
+        f.write(self.z_HTMLheader())
+        f.write('<link rel="stylesheet" type="text/css" href="../tableau.css" />')
         f.write(tb.tableau(string=self.y_input).toHTML(**{caller:self.y_output}))
         f.close()
-        #time.sleep(0.05)
-        th.Thread(target=os.system, args=(fname,)).start()
+#        th.Thread(target=os.system, args=(fhtml,)).start()
+        wbb.open_new_tab(fhtml)
     def z_folder(self) :
         openFolder(self.getResouceFileName())
     def z_about(self) :
-        m = '''ot_py (alpha)
-8/21/2014
-        '''
+        m = '''
+%(appname)s (ver%(version)s build%(build)s)
+GitHub: %(github)s'''%(self.y_info)
         tk.messagebox.showinfo(title="About", message=m)
 
 root = tk.Tk()

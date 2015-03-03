@@ -166,6 +166,26 @@ def maxent_scgis(t, maxiter=10000, needtrim=True, lower_lim=-50, upper_lim=0,
         if callback : callback(w)
     return dict(zip(cons_ind, w))
 
+def loglikelihood(t) :
+    inp = get_maxent_input(t)
+    instance = inp['ins']
+    def f(w) :
+        ans = 0
+        #w = tuple(wi if coi > 0 else 0 for wi, coi in zip(w, co))
+        for ins in instance :
+            logw = tuple(sum(wi*fi 
+                    for wi, fi in zip(w, c.vio) if fi != 0)
+                for c in ins.cand)
+            #print('logw:', logw)
+            logz = math.log(sum(math.exp(x) for x in logw))
+            #print('logz:', logz)
+            ans += sum(c.freq * logwi 
+                for logwi, c in zip(logw, ins.cand) if c.freq != 0)
+            ans -= ins.freq * logz
+        return ans
+    return f
+    
+
 def maxent_cg(t, prior=None, trim0=False,
               epsilon=cg.epsilon, tol=1e-9, maxiter=None, 
               linear=cg.linear_secant, linear_tol=1e-5, linear_maxiter=4, sigma0=0.01, approx_hessian=False, 
@@ -182,7 +202,6 @@ def maxent_cg(t, prior=None, trim0=False,
     #all0 = list(0 for _ in cons_ind)
     #cons_n = len(cons_ind)
     if prior == None : prior = lambda _ : 0
-    def sqr(x) : return x*x
     
     co = list(1 for _ in cons_ind)
     def f(w) :

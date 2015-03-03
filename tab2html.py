@@ -1,4 +1,5 @@
 import tableau as tb
+import maxent
 import math
 
 class Error(Exception) : pass
@@ -115,10 +116,15 @@ class tableauMixin :#(tb.tableau) :
     def toHTML(self, **dic) :
         for m in ('cd', 'maxent') :
             if m in dic :
-                inp = getattr(self, '_prep_'+m)(dic.pop(m))
-                return '''<link rel="stylesheet" type="text/css" href="tableau.css" />
-                '''+'<br>\n'.join(getattr(d, 'toHTML_'+m)(inp, **dic) 
-                    for d in self.datum)
+                ans = dic.pop(m)
+                inp = getattr(self, '_prep_'+m)(ans)
+                return ('''<h2>Tableax</h2>                
+                '''
+                +('<p>Log Likelihood: %f</p>'%(
+                    maxent.loglikelihood(self)(tuple(ans[i] for i in self.get_constraint_indices()))
+                    ) if m == 'maxent' else '')
+                +'<br>\n'.join(getattr(d, 'toHTML_'+m)(inp, **dic) 
+                    for d in self.datum))
         raise UnimplementedError(dic)
     def _prep_cd(self, cd) :
         return cd
