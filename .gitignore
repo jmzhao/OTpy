@@ -4,3 +4,5 @@ InputFiles
 *.bat
 *.png
 *.html
+*.*~
+*.swp
